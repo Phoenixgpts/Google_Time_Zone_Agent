@@ -3,7 +3,7 @@ from openai import OpenAI
 from docx import Document
 from io import BytesIO
 import requests
-from datetime import datetime
+from datetime import datetime, timedelta  # datetime 모듈 추가
 import pytz
 import urllib.parse
 
@@ -153,6 +153,7 @@ birth_date = st.date_input("생년월일을 입력하세요:", datetime(2000, 1,
 if st.button("생일-나이 확인"):
     def get_age_and_birthday_info(birth_date):
         today = datetime.today()
+        birth_date = datetime.combine(birth_date, datetime.min.time())  # datetime 객체로 변환
         this_year_birthday = birth_date.replace(year=today.year)
 
         # 나이 계산
