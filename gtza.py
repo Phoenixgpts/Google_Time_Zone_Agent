@@ -3,13 +3,12 @@ from openai import OpenAI
 from docx import Document
 from io import BytesIO
 import requests
-from datetime import datetime, timedelta  # datetime 모듈 추가
+from datetime import datetime
 import pytz
 import urllib.parse
 
 # Streamlit에서 환경 변수(Secrets) 가져오기
 openai_api_key = st.secrets["OPENAI_API_KEY"]
-google_time_zone_api_key = st.secrets["GOOGLE_TIME_ZONE_API_KEY"]
 
 # Streamlit 페이지 설정
 st.set_page_config(
@@ -37,8 +36,8 @@ model_selection = st.sidebar.radio(
 # 선택된 모델에 따라 사용할 모델 이름 설정
 model_name = "gpt-4-turbo" if model_selection == "GPT-4-turbo" else "gpt-4-o-mini"
 
-# 3. Doc-Sum: 문서 요약 기능
-st.header("Doc-Sum: 문서 요약 기능")
+# 문서 요약 및 생성 기능
+st.header("Doc-Sum: 문서 요약 및 생성 기능")
 
 # 파일 업로드 메뉴
 uploaded_file_sum = st.file_uploader("요약할 문서를 업로드 해 주세요", type=["docx"], key="sum_file")
@@ -85,25 +84,42 @@ elif uploaded_link_sum:
     except Exception as e:
         st.error(f"문서 링크를 불러오는 도중 에러가 발생했습니다: {str(e)}")
 
+def chunk_text(text, chunk_size=3000):
+    """문서를 특정 크기로 나누는 함수"""
+    words = text.split()
+    for i in range(0, len(words), chunk_size):
+        yield ' '.join(words[i:i + chunk_size])
+
+def summarize_chunks(chunks, model_name, keyword, prompt):
+    """각 청크에 대해 요약을 요청하고 결과를 합치는 함수"""
+    summaries = []
+    for chunk in chunks:
+        try:
+            response = client.chat.completions.create(
+                model=model_name,
+                messages=[
+                    {"role": "system", "content": prompt},
+                    {"role": "user", "content": f"{keyword}\n\n{chunk}"}
+                ],
+                max_tokens=2000,  # 2000 토큰으로 설정
+                temperature=generation_config["temperature"],
+                top_p=generation_config["top_p"]
+            )
+            summaries.append(response.choices[0].message.content.strip())
+        except Exception as e:
+            st.error(f"오류가 발생했습니다: {str(e)}")
+    return "\n\n".join(summaries)
+
 if doc_text_sum:
     st.header("문서 내용 요약")
 
+    # 문서를 나누어 처리할 준비
+    chunks = list(chunk_text(doc_text_sum))
+
     if st.button("요약 생성"):
         with st.spinner("요약을 생성하는 중입니다..."):
-            try:
-                response = client.chat.completions.create(
-                    model=model_name,  # 선택된 모델 이름 사용
-                    messages=[
-                        {"role": "system", "content": language_prompts[output_language_sum]},
-                        {"role": "user", "content": f"{summary_keyword}\n\n{doc_text_sum}"}
-                    ],
-                    max_tokens=500,
-                    temperature=generation_config["temperature"],
-                    top_p=generation_config["top_p"]
-                )
-                st.success(response.choices[0].message.content.strip())
-            except Exception as e:
-                st.error(f"오류가 발생했습니다: {str(e)}")
+            summary = summarize_chunks(chunks, model_name, summary_keyword, language_prompts[output_language_sum])
+            st.success(summary)
 
 # 4. Timezone: 사용자가 입력한 장소의 시간 확인
 st.header("Timezone: 사용자가 입력한 장소의 시간 확인")
