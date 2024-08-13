@@ -4,18 +4,15 @@ from docx import Document
 from io import BytesIO
 import os
 import requests
-from dotenv import load_dotenv
 from datetime import datetime
 import pytz
 import urllib.parse
 
-# .env 파일에서 환경 변수 로드
-load_dotenv()
+# Streamlit에서 환경 변수(Secrets) 가져오기
+openai_api_key = st.secrets["OPENAI_API_KEY"]
+google_time_zone_api_key = st.secrets["GOOGLE_TIME_ZONE_API_KEY"]
 
-# API 키를 환경 변수에서 가져오기
-openai_api_key = os.getenv("OPENAI_API_KEY")
-google_time_zone_api_key = os.getenv("GOOGLE_TIME_ZONE_API_KEY")
-
+# Streamlit 페이지 설정
 st.set_page_config(
     page_title="Document NEW + EDIT + SUM + TIMEZONE",
     page_icon="📄",
