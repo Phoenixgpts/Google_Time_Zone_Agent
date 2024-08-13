@@ -6,6 +6,7 @@ import os
 import requests
 from dotenv import load_dotenv
 from datetime import datetime
+import pytz
 
 # .env 파일에서 환경 변수 로드
 load_dotenv()
@@ -28,7 +29,11 @@ generation_config = {
 }
 
 # 사이드바에서 모델 선택
-model_selection = st.sidebar.radio("**사용할 모델을 선택하세요 :**", ("Phoenix-GPT4o", "Phoenix-GPT4o-Mini"), captions=("가격↑/성능↑/속도↓", "가격↓/성능↓/속도↑"))
+model_selection = st.sidebar.radio(
+    "**사용할 모델을 선택하세요 :**", 
+    ("Phoenix-GPT4o", "Phoenix-GPT4o-Mini"), 
+    captions=("가격↑/성능↑/속도↓", "가격↓/성능↓/속도↑")
+)
 model_name = "gpt-4" if model_selection == "Phoenix-GPT4o" else "gpt-4o-mini"
 
 st.title("Document NEW + EDIT + SUM + TIMEZONE")
@@ -125,4 +130,57 @@ if doc_text_edit:
     st.header("수정한 문서의 출력 언어를 선택하세요")
     output_language_edit = st.selectbox(
         "수정한 문서의 출력 언어를 선택하세요:",
-        ("한국어", "영어", "일본어", "중국어", "러시아어", "프랑스어", "
+        ("한국어", "영어", "일본어", "중국어", "러시아어", "프랑스어", "독일어", "이탈리아어")
+    )
+    # 여기에 문서 수정 로직을 추가할 수 있습니다.
+
+# 3. Doc-Sum: 문서 요약 기능
+st.header("3. Doc-Sum")
+uploaded_file_sum = st.file_uploader("요약할 문서를 업로드 해 주세요", type=["docx"], key="sum_file")
+
+if uploaded_file_sum:
+    document = Document(uploaded_file_sum)
+    doc_text_sum = "\n".join([para.text for para in document.paragraphs])
+    st.header("문서 내용 요약")
+    
+    if st.button("요약 생성"):
+        with st.spinner("요약을 생성하는 중입니다..."):
+            try:
+                response = client.chat.completions.create(
+                    model=model_name,
+                    messages=[
+                        {"role": "system", "content": "Summarize the following document."},
+                        {"role": "user", "content": doc_text_sum}
+                    ],
+                    max_tokens=500,
+                    temperature=generation_config["temperature"],
+                    top_p=generation_config["top_p"]
+                )
+                
+                st.success(response.choices[0].message.content.strip())
+            except Exception as e:
+                st.error(f"오류가 발생했습니다: {str(e)}")
+
+# 4. Timezone: 사용자가 입력한 장소의 시간 확인
+st.header("4. Timezone")
+location = st.text_input("시간을 확인할 장소를 입력하세요:")
+
+if st.button("시간 확인") and location:
+    try:
+        geocode_url = f"https://maps.googleapis.com/maps/api/geocode/json?address={location}&key={google_time_zone_api_key}"
+        geocode_response = requests.get(geocode_url).json()
+        if geocode_response["status"] == "OK":
+            latlng = geocode_response["results"][0]["geometry"]["location"]
+            timezone_url = f"https://maps.googleapis.com/maps/api/timezone/json?location={latlng['lat']},{latlng['lng']}&timestamp={int(datetime.now().timestamp())}&key={google_time_zone_api_key}"
+            timezone_response = requests.get(timezone_url).json()
+            if timezone_response["status"] == "OK":
+                tz_id = timezone_response["timeZoneId"]
+                tz_name = timezone_response["timeZoneName"]
+                local_time = datetime.now(pytz.timezone(tz_id))
+                st.success(f"{location}의 현재 시간: {local_time.strftime('%Y-%m-%d %H:%M:%S')} ({tz_name})")
+            else:
+                st.error("시간대를 불러오는 데 실패했습니다.")
+        else:
+            st.error("위치를 찾을 수 없습니다.")
+    except Exception as e:
+        st.error(f"시간을 확인하는 도중 에러가 발생했습니다: {str(e)}")
