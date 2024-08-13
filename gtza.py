@@ -7,6 +7,7 @@ import requests
 from dotenv import load_dotenv
 from datetime import datetime
 import pytz
+import urllib.parse
 
 # .env 파일에서 환경 변수 로드
 load_dotenv()
@@ -167,8 +168,11 @@ location = st.text_input("시간을 확인할 장소를 입력하세요:")
 
 if st.button("시간 확인") and location:
     try:
-        geocode_url = f"https://maps.googleapis.com/maps/api/geocode/json?address={location}&key={google_time_zone_api_key}"
+        # 주소를 URL 인코딩
+        encoded_location = urllib.parse.quote(location)
+        geocode_url = f"https://maps.googleapis.com/maps/api/geocode/json?address={encoded_location}&key={google_time_zone_api_key}"
         geocode_response = requests.get(geocode_url).json()
+
         if geocode_response["status"] == "OK":
             latlng = geocode_response["results"][0]["geometry"]["location"]
             timezone_url = f"https://maps.googleapis.com/maps/api/timezone/json?location={latlng['lat']},{latlng['lng']}&timestamp={int(datetime.now().timestamp())}&key={google_time_zone_api_key}"
@@ -181,6 +185,6 @@ if st.button("시간 확인") and location:
             else:
                 st.error("시간대를 불러오는 데 실패했습니다.")
         else:
-            st.error("위치를 찾을 수 없습니다.")
+            st.error(f"위치를 찾을 수 없습니다. 상태 코드: {geocode_response['status']}, 메시지: {geocode_response.get('error_message', '없음')}")
     except Exception as e:
         st.error(f"시간을 확인하는 도중 에러가 발생했습니다: {str(e)}")
