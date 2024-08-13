@@ -6,7 +6,6 @@ import requests
 from datetime import datetime
 import pytz
 import urllib.parse
-import tiktoken
 
 # Streamlit에서 환경 변수(Secrets) 가져오기
 openai_api_key = st.secrets["OPENAI_API_KEY"]
@@ -68,31 +67,6 @@ language_prompts = {
     "아랍어": "يرجى تلخيص المستند التالي باللغة العربية."
 }
 
-def calculate_tokens(text):
-    tokenizer = tiktoken.encoding_for_model("gpt-4-turbo")
-    tokens = tokenizer.encode(text)
-    return len(tokens)
-
-def split_text_by_tokens(text, max_tokens=2000):
-    tokenizer = tiktoken.encoding_for_model("gpt-4-turbo")
-    tokens = tokenizer.encode(text)
-    chunks = []
-    current_chunk = []
-    current_length = 0
-    
-    for token in tokens:
-        current_chunk.append(token)
-        current_length += 1
-        if current_length >= max_tokens:
-            chunks.append(tokenizer.decode(current_chunk))
-            current_chunk = []
-            current_length = 0
-    
-    if current_chunk:
-        chunks.append(tokenizer.decode(current_chunk))
-    
-    return chunks
-
 doc_text_sum = ""
 
 # 파일이 업로드된 경우 파일 내용을 사용
@@ -113,39 +87,43 @@ elif uploaded_link_sum:
 
 if doc_text_sum:
     st.header("문서 내용 요약")
-    
-    # 문서의 토큰 길이 계산
-    total_tokens = calculate_tokens(doc_text_sum)
-    
-    if total_tokens > 8192:
-        st.error(f"문서가 너무 깁니다. 문서의 총 토큰 수: {total_tokens}. 문서를 분할하여 요약합니다.")
-        chunks = split_text_by_tokens(doc_text_sum)
-    else:
-        chunks = [doc_text_sum]
 
-    # 요약 요청 처리
-    for i, chunk in enumerate(chunks):
-        st.subheader(f"문서 요약 {i+1}/{len(chunks)}")
-        if st.button(f"요약 생성 {i+1}"):
-            with st.spinner("요약을 생성하는 중입니다..."):
-                try:
-                    response = client.chat.completions.create(
-                        model=model_name,  # 선택된 모델 이름 사용
-                        messages=[
-                            {"role": "system", "content": language_prompts[output_language_sum]},
-                            {"role": "user", "content": f"{summary_keyword}\n\n{chunk}"}
-                        ],
-                        max_tokens=500,
-                        temperature=generation_config["temperature"],
-                        top_p=generation_config["top_p"]
-                    )
-                    st.success(response.choices[0].message.content.strip())
-                except Exception as e:
-                    st.error(f"오류가 발생했습니다: {str(e)}")
+    if st.button("요약 생성"):
+        with st.spinner("요약을 생성하는 중입니다..."):
+            try:
+                response = client.chat.completions.create(
+                    model=model_name,  # 선택된 모델 이름 사용
+                    messages=[
+                        {"role": "system", "content": language_prompts[output_language_sum]},
+                        {"role": "user", "content": f"{summary_keyword}\n\n{doc_text_sum}"}
+                    ],
+                    max_tokens=500,
+                    temperature=generation_config["temperature"],
+                    top_p=generation_config["top_p"]
+                )
+                st.success(response.choices[0].message.content.strip())
+            except Exception as e:
+                st.error(f"오류가 발생했습니다: {str(e)}")
 
 # 4. Timezone: 사용자가 입력한 장소의 시간 확인
 st.header("Timezone: 사용자가 입력한 장소의 시간 확인")
 location = st.text_input("시간을 확인할 장소를 입력하세요:")
+
+# 생년월일 입력 메뉴
+birth_date = st.date_input("생년월일을 입력하세요:", datetime(2000, 1, 1))
+
+def get_age_and_birthday_info(birth_date):
+    today = datetime.today()
+    this_year_birthday = birth_date.replace(year=today.year)
+
+    # 나이 계산
+    age = today.year - birth_date.year
+    if today < this_year_birthday:
+        age -= 1
+
+    # 생일 지났는지 여부 확인
+    birthday_passed = today >= this_year_birthday
+    return age, birthday_passed
 
 def get_timezone_info(location, retries=2):
     try:
@@ -180,3 +158,10 @@ if st.button("시간 확인") and location:
         local_time, tz_name = get_timezone_info(location)
         if local_time and tz_name:
             st.success(f"{location}의 현재 시간: {local_time.strftime('%Y-%m-%d %H:%M:%S')} ({tz_name})")
+
+    # 생년월일 정보 출력
+    age, birthday_passed = get_age_and_birthday_info(birth_date)
+    if birthday_passed:
+        st.info(f"생일이 지났습니다. 현재 {age}살입니다.")
+    else:
+        st.info(f"생일이 아직 지나지 않았습니다. 현재 {age}살입니다.")
