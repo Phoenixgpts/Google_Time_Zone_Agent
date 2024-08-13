@@ -107,59 +107,63 @@ if doc_text_sum:
 
 # 4. Timezone: 사용자가 입력한 장소의 시간 확인
 st.header("Timezone: 사용자가 입력한 장소의 시간 확인")
+
+# 시간 확인 메뉴
 location = st.text_input("시간을 확인할 장소를 입력하세요:")
-
-# 생년월일 입력 메뉴
-birth_date = st.date_input("생년월일을 입력하세요:", datetime(2000, 1, 1))
-
-def get_age_and_birthday_info(birth_date):
-    today = datetime.today()
-    this_year_birthday = birth_date.replace(year=today.year)
-
-    # 나이 계산
-    age = today.year - birth_date.year
-    if today < this_year_birthday:
-        age -= 1
-
-    # 생일 지났는지 여부 확인
-    birthday_passed = today >= this_year_birthday
-    return age, birthday_passed
-
-def get_timezone_info(location, retries=2):
-    try:
-        encoded_location = urllib.parse.quote(location)
-        geocode_url = f"https://maps.googleapis.com/maps/api/geocode/json?address={encoded_location}&key={google_time_zone_api_key}"
-        geocode_response = requests.get(geocode_url).json()
-
-        if geocode_response["status"] == "OK":
-            latlng = geocode_response["results"][0]["geometry"]["location"]
-            timezone_url = f"https://maps.googleapis.com/maps/api/timezone/json?location={latlng['lat']},{latlng['lng']}&timestamp={int(datetime.now().timestamp())}&key={google_time_zone_api_key}"
-            timezone_response = requests.get(timezone_url).json()
-
-            if timezone_response["status"] == "OK":
-                tz_id = timezone_response["timeZoneId"]
-                tz_name = timezone_response["timeZoneName"]
-                local_time = datetime.now(pytz.timezone(tz_id))
-                return local_time, tz_name
-            else:
-                st.error(f"시간대를 불러오는 데 실패했습니다. 상태 코드: {timezone_response['status']}, 메시지: {timezone_response.get('errorMessage', '없음')}")
-        else:
-            st.error(f"위치를 찾을 수 없습니다. 상태 코드: {geocode_response['status']}, 메시지: {geocode_response.get('error_message', '없음')}")
-    except Exception as e:
-        if retries > 0:
-            time.sleep(1)  # 잠시 대기 후 재시도
-            return get_timezone_info(location, retries - 1)
-        else:
-            st.error(f"시간을 확인하는 도중 에러가 발생했습니다: {str(e)}")
-            return None, None
-
 if st.button("시간 확인") and location:
     with st.spinner("시간을 확인하는 중입니다..."):
+        def get_timezone_info(location, retries=2):
+            try:
+                encoded_location = urllib.parse.quote(location)
+                geocode_url = f"https://maps.googleapis.com/maps/api/geocode/json?address={encoded_location}&key={google_time_zone_api_key}"
+                geocode_response = requests.get(geocode_url).json()
+
+                if geocode_response["status"] == "OK":
+                    latlng = geocode_response["results"][0]["geometry"]["location"]
+                    timezone_url = f"https://maps.googleapis.com/maps/api/timezone/json?location={latlng['lat']},{latlng['lng']}&timestamp={int(datetime.now().timestamp())}&key={google_time_zone_api_key}"
+                    timezone_response = requests.get(timezone_url).json()
+
+                    if timezone_response["status"] == "OK":
+                        tz_id = timezone_response["timeZoneId"]
+                        tz_name = timezone_response["timeZoneName"]
+                        local_time = datetime.now(pytz.timezone(tz_id))
+                        return local_time, tz_name
+                    else:
+                        st.error(f"시간대를 불러오는 데 실패했습니다. 상태 코드: {timezone_response['status']}, 메시지: {timezone_response.get('errorMessage', '없음')}")
+                else:
+                    st.error(f"위치를 찾을 수 없습니다. 상태 코드: {geocode_response['status']}, 메시지: {geocode_response.get('error_message', '없음')}")
+            except Exception as e:
+                if retries > 0:
+                    time.sleep(1)  # 잠시 대기 후 재시도
+                    return get_timezone_info(location, retries - 1)
+                else:
+                    st.error(f"시간을 확인하는 도중 에러가 발생했습니다: {str(e)}")
+                    return None, None
+
         local_time, tz_name = get_timezone_info(location)
         if local_time and tz_name:
             st.success(f"{location}의 현재 시간: {local_time.strftime('%Y-%m-%d %H:%M:%S')} ({tz_name})")
 
-    # 생년월일 정보 출력
+# 생년월일 입력 메뉴
+st.header("생년월일 확인")
+
+# 생년월일 입력창
+birth_date = st.date_input("생년월일을 입력하세요:", datetime(2000, 1, 1))
+
+if st.button("생일-나이 확인"):
+    def get_age_and_birthday_info(birth_date):
+        today = datetime.today()
+        this_year_birthday = birth_date.replace(year=today.year)
+
+        # 나이 계산
+        age = today.year - birth_date.year
+        if today < this_year_birthday:
+            age -= 1
+
+        # 생일 지났는지 여부 확인
+        birthday_passed = today >= this_year_birthday
+        return age, birthday_passed
+
     age, birthday_passed = get_age_and_birthday_info(birth_date)
     if birthday_passed:
         st.info(f"생일이 지났습니다. 현재 {age}살입니다.")
