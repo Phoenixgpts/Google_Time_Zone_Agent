@@ -101,7 +101,7 @@ def summarize_chunks(chunks, model_name, keyword, prompt):
                     {"role": "system", "content": prompt},
                     {"role": "user", "content": f"{keyword}\n\n{chunk}"}
                 ],
-                max_tokens=2000,  # 2000 토큰으로 설정
+                max_tokens=4000,  # 4000 토큰으로 설정
                 temperature=generation_config["temperature"],
                 top_p=generation_config["top_p"]
             )
